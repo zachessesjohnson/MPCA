@@ -1,0 +1,32 @@
+Package: mpca
+Title: Multilevel PCA for Composite Indices with Measurement Error Correction
+Version: 0.1.0
+Authors@R:
+    person("MPCA", "Authors", role = c("aut", "cre"),
+           email = "mpca@example.com")
+Description: Implements measurement-error-corrected principal component
+    analysis (MPCA) for composite indices where each sub-index has
+    associated uncertainty estimates from bootstrapped confidence intervals.
+    The package provides: (1) a three-pass missing-data imputation
+    hierarchy (within-country linear interpolation, year-mean fallback,
+    global-mean fallback); (2) an Option Filter minimum-coverage filter;
+    (3) naive PC1 aggregation; (4) attenuation correction via
+    disattenuation of correlations (Spearman 1904), with nearest
+    positive-semidefinite projection; (5) a two-stage bootstrap that
+    propagates both Stage-1 measurement error and Stage-2 sampling
+    uncertainty into composite confidence intervals; and (6) standard
+    post-processing (z-score, Box-Cox, min-max rescaling).
+License: MIT + file LICENSE
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.1
+Imports:
+    Matrix,
+    stats,
+    utils
+Suggests:
+    testthat (>= 3.0.0),
+    knitr,
+    rmarkdown
+Config/testthat/edition: 3
+
