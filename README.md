@@ -1,7 +1,8 @@
-# MPCA — Multilevel PCA for Composite Indices
+# MPCA — Multilevel PCA with Measurement Error Correction
 
 > Measurement-error-corrected composite indices with uncertainty propagation.
 > Available as both an **R package** and a **Python package**.
+> Works with any panel or cross-sectional data — not restricted to countries.
 
 ---
 
@@ -46,7 +47,7 @@ arise in this setting:
 | Sub-indices are noisy → naive PCA underestimates the common signal | Spearman disattenuation: subtract estimated error variance from the covariance diagonal |
 | Final composite lacks uncertainty quantification | Two-stage bootstrap: propagate both measurement error and sampling variability into composite CIs |
 
-The output is a country-year panel of composite scores on a 0–100 scale,
+The output is a panel of composite scores on a 0–100 scale,
 each accompanied by a 95% CI, plus a breakdown of each sub-index's loading
 and weight in the naive and corrected solutions.
 
@@ -56,7 +57,7 @@ and weight in the naive and corrected solutions.
 
 ### The attenuation-bias problem
 
-Suppose you observe K sub-index scores for N country-year units.  Each
+Suppose you observe K sub-index scores for N observations.  Each
 sub-index j is a *noisy* estimate of an unobserved true score:
 
 ```
@@ -221,17 +222,16 @@ print(mpca.__version__)   # "0.1.0"
 
 ## Input Data Requirements
 
-Both implementations expect a flat panel data structure — one row per
-country-year observation — with the following columns.
+Both implementations expect a flat panel or cross-sectional data structure — one row per observation — with the following columns.
 
 | Column group | Convention | Description |
 |---|---|---|
-| Sub-index scores | e.g. `s1`, `s2`, …, `sK` | Point estimate for sub-index j in country i, year t.  Should be on a common scale (e.g. 0–100).  May be `NA`/`NaN` for missing observations. |
+| Sub-index scores | e.g. `s1`, `s2`, …, `sK` | Point estimate for sub-index j for observation i.  Should be on a common scale (e.g. 0–100).  May be `NA`/`NaN` for missing observations. |
 | Lower CI bounds | e.g. `s1_lower`, …, `sK_lower` | 95% CI lower bound corresponding to each score. |
 | Upper CI bounds | e.g. `s1_upper`, …, `sK_upper` | 95% CI upper bound corresponding to each score. |
-| Country name | `country` (configurable) | Full country name string. |
-| ISO code | `iso` (configurable) | ISO 3166-1 alpha-3 code (or any unique country identifier). |
-| Year | `year` (configurable) | Integer year. |
+| Identifier columns | any names (configurable via `id_cols`) | Any columns you want carried through to the output (e.g. unit ID, time period, group label). |
+| Group column | e.g. `group` (configurable via `group_col`) | Optional. Identifies the grouping unit for within-group interpolation (Pass 1 of imputation). |
+| Time column | e.g. `time` (configurable via `time_col`) | Optional. Identifies the time period for the time-mean fallback (Pass 2 of imputation) and for filtering the rankings table. |
 
 **Notes**
 
@@ -243,6 +243,9 @@ country-year observation — with the following columns.
   but missing CI bounds; in that case the half-width is treated as 0 (no
   measurement-error contribution for that cell), matching the convention used
   for imputed positions.
+- `group_col` and `time_col` are both optional.  Without `group_col`, Pass 1
+  is skipped; without `time_col`, Pass 2 is skipped.  At least Pass 3 (global
+  mean) always applies.
 
 ---
 
@@ -270,8 +273,8 @@ Raw panel data
       ▼
 ┌─────────────────────────────────┐
 │ Step 3 — Three-pass imputation  │  three_pass_imputation()
-│   Pass 1: within-country interp │
-│   Pass 2: year-mean fallback    │
+│   Pass 1: within-group interp   │
+│   Pass 2: time-mean fallback    │
 │   Pass 3: global-mean fallback  │
 └─────────────────────────────────┘
       │  produces: Ŝ (N×K), H (N×K)
@@ -315,9 +318,9 @@ Raw panel data
 
 **Function**: `option_b_filter(data, score_cols, min_obs = 5)`
 
-Country-year observations where fewer than `min_obs` of the K sub-indices
-are non-missing are excluded from the PCA estimation.  The function adds two
-columns to the input frame:
+Observations where fewer than `min_obs` of the K sub-indices are non-missing
+are excluded from the PCA estimation.  The function adds two columns to the
+input frame:
 
 - `n_obs` — integer count of non-missing sub-index scores per row.
 - `valid_composite` — boolean flag; `TRUE` when `n_obs >= min_obs`.
@@ -345,40 +348,40 @@ bounds, the half-width is set to 0 (no error contribution for that cell).
 
 ### Step 3 — Three-Pass Imputation
 
-**Function**: `three_pass_imputation(data, score_cols, half_width_cols, country_col, year_col)`
+**Function**: `three_pass_imputation(data, score_cols, half_width_cols, group_col, time_col)`
 
 Applied independently to each of the K sub-index columns in the order listed
 below.  The goal is to fill every cell so that PCA can proceed on a complete
 matrix, while preserving as much observed information as possible.
 
-**Pass 1 — Within-country linear interpolation**
+**Pass 1 — Within-group linear interpolation** *(requires group_col)*
 
-For each country, the time series of observed scores is linearly interpolated
+For each group, the time series of observed scores is linearly interpolated
 across interior gaps, and end gaps are filled by carry-forward / carry-back
-(equivalent to `zoo::na.approx(rule = 2)` in R and `pd.Series.interpolate(limit_direction='both')` in Python).
+(equivalent to `zoo::na.approx(rule = 2)` in R and
+`pd.Series.interpolate(limit_direction='both')` in Python).
+Skipped when `group_col` is `NULL` / `None`.
 
-*Example*: country A has scores 50, NA, 60 in years 2000–2002 → Pass 1
-fills year 2001 with 55.
+*Example*: group A has scores 50, NA, 60 in time periods 1–3 → Pass 1
+fills period 2 with 55.
 
-**Pass 2 — Year-mean fallback**
+**Pass 2 — Time-period-mean fallback** *(requires time_col)*
 
-Any position still missing after Pass 1 (e.g. a country whose entire time
-series is absent) is filled with the cross-country mean for that year,
-computed from Pass-1 values.
+Any position still missing after Pass 1 (e.g. a group whose entire series is
+absent) is filled with the cross-group mean for that time period, computed
+from Pass-1 values.  Skipped when `time_col` is `NULL` / `None`.
 
 **Pass 3 — Global-mean fallback**
 
-Any position still missing after Pass 2 (e.g. a year where *no* country has
-an observed value) is filled with the global mean of the raw (pre-imputation)
-scores.
+Any position still missing after Pass 2 (e.g. a time period where *no* group
+has an observed value, or when both `group_col` and `time_col` are omitted)
+is filled with the global mean of the raw (pre-imputation) scores.
 
 **Half-width convention**: positions filled by any of the three passes
 receive a half-width of 0 in the H matrix.  This means imputed cells
 contribute no measurement-error variance to the attenuation correction — a
 conservative choice that avoids fabricating uncertainty for values that are
 already assumed.
-
----
 
 ### Step 4 — Naive PCA
 
@@ -561,17 +564,17 @@ named list / dict.
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
-| `data` | data.frame / DataFrame | — | Input panel. |
+| `data` | data.frame / DataFrame | — | Input data. |
 | `score_cols` | character / list of str | — | K sub-index score column names. |
 | `lower_cols` | character / list of str | — | K lower CI column names (same order). |
 | `upper_cols` | character / list of str | — | K upper CI column names (same order). |
-| `country_col` | string | `"country"` | Country name column. |
-| `iso_col` | string | `"iso"` | ISO code column. |
-| `year_col` | string | `"year"` | Year column. |
+| `id_cols` | character / list of str | `NULL` / `None` | Identifier columns to carry through to `scores_df`. |
+| `group_col` | string | `NULL` / `None` | Grouping-unit column for within-group interpolation (Pass 1). |
+| `time_col` | string | `NULL` / `None` | Time-period column for time-mean fallback (Pass 2) and rankings filter. |
 | `B` | integer | `500` | Bootstrap replicates. |
 | `seed` | integer | `42` | Random seed for reproducibility. |
 | `min_obs` | integer | `5` | Minimum non-missing sub-indices required. |
-| `rankings_year` | integer / NULL | `2024` | Year for ranked output; `NULL` / `None` skips. |
+| `rankings_value` | scalar / NULL | `NULL` / `None` | Value of `time_col` for ranked output; `NULL` / `None` skips rankings. |
 
 **Returns**: named list / dict with keys `scores_df`, `contributions_df`,
 `rankings_df` (see [Output Format](#output-format)).
@@ -598,8 +601,8 @@ named list / dict.
 | `data` | data.frame / DataFrame | — | Analysis-set rows (valid composites only). |
 | `score_cols` | character / list of str | — | Sub-index score column names. |
 | `half_width_cols` | character / list of str | — | CI half-width column names (same order). |
-| `country_col` | string | `"country"` | Country identifier column. |
-| `year_col` | string | `"year"` | Year column. |
+| `group_col` | string | `NULL` / `None` | Grouping-unit column; `NULL` skips Pass 1. |
+| `time_col` | string | `NULL` / `None` | Time-period column; `NULL` skips Pass 2. |
 
 **Returns**: `(S_hat, H)` — both N×K numeric matrices.  In R these are
 returned as a named list `list(S_hat = ..., H = ...)`.
@@ -692,14 +695,11 @@ and `boot_scores` (N×B, `NA`/`NaN` for unsampled cells).
 
 ### `scores_df`
 
-One row per country-year observation in the analysis set (rows passing the
-Option Filter).
+One row per observation in the analysis set (rows passing the Option Filter).
 
 | Column | Type | Description |
 |---|---|---|
-| `country` | string | Country name. |
-| `iso` | string | ISO 3166-1 alpha-3 code. |
-| `year` | integer | Year. |
+| *(id_cols)* | any | Identifier columns passed through from the input (as specified by `id_cols`). |
 | `score` | float [0, 100] | Post-processed composite score. |
 | `ci_lower` | float [0, 100] | Lower bound of 95% CI. |
 | `ci_upper` | float [0, 100] | Upper bound of 95% CI. |
@@ -719,9 +719,10 @@ One row per sub-index.
 
 ### `rankings_df`
 
-Subset of `scores_df` for `rankings_year`, sorted descending by `score`,
-with an additional `rank` column (1 = highest score).  Empty if
-`rankings_year` is `NULL` / `None` or no rows match the year.
+Subset of `scores_df` where `time_col == rankings_value`, sorted descending
+by `score`, with an additional `rank` column (1 = highest score).  Empty if
+`rankings_value` is `NULL` / `None`, `time_col` is not specified, or no rows
+match the value.
 
 ---
 
@@ -736,29 +737,28 @@ library(mpca)
 set.seed(1)
 n <- 50
 data <- data.frame(
-  country = rep(paste0("C", 1:10), each = 5),
-  iso     = rep(paste0("C0", 1:10), each = 5),
-  year    = rep(2020:2024, times = 10)
+  unit = rep(paste0("U", 1:10), each = 5),
+  time = rep(1:5, times = 10)
 )
 for (k in 1:8) {
-  data[[paste0("s",  k)]]       <- runif(n, 40, 80)
+  data[[paste0("s",  k)]]         <- runif(n, 40, 80)
   data[[paste0("s",  k, "_lower")]] <- data[[paste0("s", k)]] - runif(n, 2, 8)
   data[[paste0("s",  k, "_upper")]] <- data[[paste0("s", k)]] + runif(n, 2, 8)
 }
 
 # ---- Run the pipeline ----
 result <- mpca_pipeline(
-  data        = data,
-  score_cols  = paste0("s", 1:8),
-  lower_cols  = paste0("s", 1:8, "_lower"),
-  upper_cols  = paste0("s", 1:8, "_upper"),
-  country_col = "country",
-  iso_col     = "iso",
-  year_col    = "year",
-  B           = 200L,    # use 500+ in practice
-  seed        = 42L,
-  min_obs     = 5L,
-  rankings_year = 2024L
+  data           = data,
+  score_cols     = paste0("s", 1:8),
+  lower_cols     = paste0("s", 1:8, "_lower"),
+  upper_cols     = paste0("s", 1:8, "_upper"),
+  id_cols        = c("unit", "time"),
+  group_col      = "unit",
+  time_col       = "time",
+  B              = 200L,    # use 500+ in practice
+  seed           = 42L,
+  min_obs        = 5L,
+  rankings_value = 5L
 )
 
 # ---- Inspect outputs ----
@@ -779,19 +779,18 @@ from mpca import mpca_pipeline
 
 # ---- Minimal synthetic dataset ----
 rng = np.random.default_rng(1)
-n_countries, n_years, K = 10, 5, 8
-countries = [f"C{i}" for i in range(1, n_countries + 1)]
+n_units, n_periods, K = 10, 5, 8
 rows = [
-    {"country": c, "iso": f"C0{i+1}", "year": yr}
-    for i, c in enumerate(countries)
-    for yr in range(2020, 2020 + n_years)
+    {"unit": f"U{i}", "time": t}
+    for i in range(1, n_units + 1)
+    for t in range(1, n_periods + 1)
 ]
 data = pd.DataFrame(rows)
 for k in range(1, K + 1):
     scores = rng.uniform(40, 80, len(data))
-    data[f"s{k}"]       = scores
-    data[f"s{k}_lower"] = scores - rng.uniform(2, 8, len(data))
-    data[f"s{k}_upper"] = scores + rng.uniform(2, 8, len(data))
+    data[f"s{k}"]         = scores
+    data[f"s{k}_lower"]   = scores - rng.uniform(2, 8, len(data))
+    data[f"s{k}_upper"]   = scores + rng.uniform(2, 8, len(data))
 
 # ---- Run the pipeline ----
 result = mpca_pipeline(
@@ -799,13 +798,13 @@ result = mpca_pipeline(
     score_cols=[f"s{k}" for k in range(1, K + 1)],
     lower_cols=[f"s{k}_lower" for k in range(1, K + 1)],
     upper_cols=[f"s{k}_upper" for k in range(1, K + 1)],
-    country_col="country",
-    iso_col="iso",
-    year_col="year",
+    id_cols=["unit", "time"],
+    group_col="unit",
+    time_col="time",
     B=200,          # use 500+ in practice
     seed=42,
     min_obs=5,
-    rankings_year=2024,
+    rankings_value=5,
 )
 
 # ---- Inspect outputs ----
@@ -828,12 +827,15 @@ from mpca import (
     two_stage_bootstrap,
     postprocess_scores,
 )
-import numpy as np
 
 # After option_b_filter and half-width computation ...
-S_hat, H = three_pass_imputation(data_valid, score_cols, hw_cols)
-naive    = naive_pca(S_hat)
-corr     = attenuation_correction(S_hat, H, naive)
+S_hat, H = three_pass_imputation(
+    data_valid, score_cols, hw_cols,
+    group_col="unit",
+    time_col="time",
+)
+naive = naive_pca(S_hat)
+corr  = attenuation_correction(S_hat, H, naive)
 
 print("Naive PC1 variance explained:    ", naive["var_explained"])
 print("Corrected PC1 variance explained:", corr["var_explained_star"])

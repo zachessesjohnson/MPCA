@@ -1,7 +1,7 @@
 #' Option Filter Minimum Sub-Index Coverage Filter
 #'
-#' Country-year observations with fewer than `min_obs` of the K sub-indices
-#' observed (pre-imputation) are flagged as invalid for the composite score.
+#' Observations with fewer than `min_obs` of the K sub-indices observed
+#' (pre-imputation) are flagged as invalid for the composite score.
 #' A new logical column `valid_composite` is added to `data`.
 #'
 #' @param data A data.frame containing sub-index score columns.
@@ -70,26 +70,25 @@ option_b_filter <- function(data, score_cols, min_obs = 5L) {
 #' Fills missing sub-index scores using a three-pass hierarchy applied
 #' column by column:
 #'
-#' - **Pass 1**: Within-country linear interpolation (interior gaps
-#'   interpolated linearly; end gaps filled by nearest-neighbor
+#' - **Pass 1** *(requires group_col)*: Within-group linear interpolation
+#'   (interior gaps interpolated linearly; end gaps filled by nearest-neighbor
 #'   carry-forward/carry-back), equivalent to `zoo::na.approx` with
-#'   `rule = 2`.
-#' - **Pass 2**: Year-mean fallback for countries whose entire series is
-#'   absent.
-#' - **Pass 3**: Global-mean fallback for years with no observed values.
+#'   `rule = 2`.  Skipped when `group_col` is `NULL`.
+#' - **Pass 2** *(requires time_col)*: Time-period-mean fallback for groups
+#'   whose entire series is absent.  Skipped when `time_col` is `NULL`.
+#' - **Pass 3**: Global-mean fallback for any positions still missing.
 #'
 #' CI half-widths are also assembled; imputed positions receive a
 #' half-width of 0 (no measurement-error contribution for imputed cells).
 #'
 #' @param data A data.frame for the analysis set (rows passing Option Filter).
-#'   Must be sorted by `country_col` then `year_col` prior to calling, or
-#'   sorting is applied internally.
 #' @param score_cols Character vector of score column names (length K).
 #' @param half_width_cols Character vector of half-width column names (same
 #'   order and length as `score_cols`).
-#' @param country_col Name of the country identifier column (default
-#'   `"country"`).
-#' @param year_col Name of the year column (default `"year"`).
+#' @param group_col Name of the grouping-unit column for within-group
+#'   interpolation (Pass 1).  `NULL` skips Pass 1 (default `NULL`).
+#' @param time_col Name of the time-period column for the time-mean fallback
+#'   (Pass 2).  `NULL` skips Pass 2 (default `NULL`).
 #'
 #' @return A named list with:
 #'   \itemize{
@@ -99,11 +98,14 @@ option_b_filter <- function(data, score_cols, min_obs = 5L) {
 #'   }
 #' @export
 three_pass_imputation <- function(data, score_cols, half_width_cols,
-                                   country_col = "country",
-                                   year_col = "year") {
-  # Sort by country then year
-  ord  <- order(data[[country_col]], data[[year_col]])
-  data <- data[ord, , drop = FALSE]
+                                   group_col = NULL,
+                                   time_col  = NULL) {
+  # Sort by group then time (whichever are provided)
+  sort_cols <- c(group_col, time_col)
+  if (length(sort_cols) > 0) {
+    ord  <- do.call(order, lapply(sort_cols, function(col) data[[col]]))
+    data <- data[ord, , drop = FALSE]
+  }
 
   N <- nrow(data)
   K <- length(score_cols)
@@ -111,8 +113,8 @@ three_pass_imputation <- function(data, score_cols, half_width_cols,
   S_hat <- matrix(NA_real_, N, K, dimnames = list(NULL, score_cols))
   H     <- matrix(0,        N, K, dimnames = list(NULL, score_cols))
 
-  countries <- data[[country_col]]
-  years     <- data[[year_col]]
+  groups <- if (!is.null(group_col)) data[[group_col]] else NULL
+  times  <- if (!is.null(time_col))  data[[time_col]]  else NULL
 
   for (j in seq_len(K)) {
     raw_scores <- data[[score_cols[j]]]
@@ -120,28 +122,32 @@ three_pass_imputation <- function(data, score_cols, half_width_cols,
 
     is_observed <- !is.na(raw_scores)
 
-    # ---- Pass 1: within-country linear interpolation ----
+    # ---- Pass 1: within-group linear interpolation ----
     s_pass1 <- raw_scores
-    for (ctry in unique(countries)) {
-      idx <- which(countries == ctry)
-      if (length(idx) < 1L) next
-      s_pass1[idx] <- .na_approx_rule2(s_pass1[idx])
+    if (!is.null(groups)) {
+      for (grp in unique(groups)) {
+        idx <- which(groups == grp)
+        if (length(idx) < 1L) next
+        s_pass1[idx] <- .na_approx_rule2(s_pass1[idx])
+      }
     }
 
-    # ---- Pass 2: year-mean fallback ----
+    # ---- Pass 2: time-period-mean fallback ----
     s_pass2  <- s_pass1
-    still_na <- is.na(s_pass2)
-    if (any(still_na)) {
-      yr_levels  <- unique(years)
-      yr_means   <- vapply(yr_levels, function(yr) {
-        mean(s_pass1[years == yr], na.rm = TRUE)
-      }, numeric(1L))
-      names(yr_means) <- as.character(yr_levels)
+    if (!is.null(times)) {
+      still_na <- is.na(s_pass2)
+      if (any(still_na)) {
+        time_levels <- unique(times)
+        time_means  <- vapply(time_levels, function(t) {
+          mean(s_pass1[times == t], na.rm = TRUE)
+        }, numeric(1L))
+        names(time_means) <- as.character(time_levels)
 
-      for (i in which(still_na)) {
-        yr_chr <- as.character(years[i])
-        ym     <- yr_means[[yr_chr]]
-        if (!is.na(ym)) s_pass2[i] <- ym
+        for (i in which(still_na)) {
+          t_chr <- as.character(times[i])
+          tm    <- time_means[[t_chr]]
+          if (!is.na(tm)) s_pass2[i] <- tm
+        }
       }
     }
 
