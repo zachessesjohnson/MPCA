@@ -40,7 +40,8 @@ naive_pca <- function(S_hat) {
   lambda1 <- ev$values[1]
   ell_hat <- ev$vectors[, 1]
 
-  # Sign convention: all loadings positive
+  # Sign convention: choose direction where sum of loadings is positive
+  # (in practice all loadings are positive when sub-indices share a common factor)
   if (sum(ell_hat) < 0) ell_hat <- -ell_hat
 
   # Regression scoring coefficients: w = R_obs^{-1} * ell

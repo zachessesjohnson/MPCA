@@ -55,7 +55,8 @@ def naive_pca(S_hat: np.ndarray) -> dict:
     lambda1 = eigenvalues[0]
     ell_hat = eigenvectors[:, 0]
 
-    # Sign convention: sum of loadings positive
+    # Sign convention: choose direction where sum of loadings is positive.
+    # In practice all loadings are positive when sub-indices share a common factor.
     if ell_hat.sum() < 0:
         ell_hat = -ell_hat
 
