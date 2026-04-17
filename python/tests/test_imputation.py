@@ -1,4 +1,4 @@
-"""Tests for imputation and Option B filter."""
+"""Tests for imputation and Option Filter."""
 
 import numpy as np
 import pandas as pd

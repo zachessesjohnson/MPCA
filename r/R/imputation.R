@@ -1,4 +1,4 @@
-#' Option B Minimum Sub-Index Coverage Filter
+#' Option Filter Minimum Sub-Index Coverage Filter
 #'
 #' Country-year observations with fewer than `min_obs` of the K sub-indices
 #' observed (pre-imputation) are flagged as invalid for the composite score.
@@ -81,7 +81,7 @@ option_b_filter <- function(data, score_cols, min_obs = 5L) {
 #' CI half-widths are also assembled; imputed positions receive a
 #' half-width of 0 (no measurement-error contribution for imputed cells).
 #'
-#' @param data A data.frame for the analysis set (rows passing Option B).
+#' @param data A data.frame for the analysis set (rows passing Option Filter).
 #'   Must be sorted by `country_col` then `year_col` prior to calling, or
 #'   sorting is applied internally.
 #' @param score_cols Character vector of score column names (length K).

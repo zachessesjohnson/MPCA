@@ -9,7 +9,7 @@ Description: Implements measurement-error-corrected principal component
     associated uncertainty estimates from bootstrapped confidence intervals.
     The package provides: (1) a three-pass missing-data imputation
     hierarchy (within-country linear interpolation, year-mean fallback,
-    global-mean fallback); (2) an Option-B minimum-coverage filter;
+    global-mean fallback); (2) an Option Filter minimum-coverage filter;
     (3) naive PC1 aggregation; (4) attenuation correction via
     disattenuation of correlations (Spearman 1904), with nearest
     positive-semidefinite projection; (5) a two-stage bootstrap that

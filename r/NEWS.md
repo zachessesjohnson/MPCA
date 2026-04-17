@@ -8,7 +8,7 @@ Initial release.
 
 * `mpca_pipeline()` — end-to-end pipeline returning composite scores,
   sub-index contributions, and optional year-specific rankings.
-* `option_b_filter()` — Option B minimum-coverage filter: marks
+* `option_b_filter()` — Option Filter minimum-coverage filter: marks
   country-year observations with fewer than `min_obs` observed sub-indices
   as invalid for the composite.
 * `three_pass_imputation()` — three-pass missing-data hierarchy:

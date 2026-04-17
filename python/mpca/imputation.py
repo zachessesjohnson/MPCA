@@ -1,4 +1,4 @@
-"""Missing-data imputation and Option B coverage filter."""
+"""Missing-data imputation and Option Filter coverage filter."""
 
 import numpy as np
 import pandas as pd
@@ -10,7 +10,7 @@ def option_b_filter(
     min_obs: int = 5,
 ) -> pd.DataFrame:
     """
-    Flag rows that have insufficient sub-index coverage (Option B).
+    Flag rows that have insufficient sub-index coverage (Option Filter).
 
     Country-year observations with fewer than *min_obs* of the K sub-indices
     observed (pre-imputation) receive ``valid_composite = False`` and should
@@ -67,7 +67,7 @@ def three_pass_imputation(
     Parameters
     ----------
     data : pd.DataFrame
-        Analysis-set observations (rows passing Option B), sorted or
+        Analysis-set observations (rows passing Option Filter), sorted or
         sortable by *country_col* then *year_col*.
     score_cols : list of str
         Score column names (length K).

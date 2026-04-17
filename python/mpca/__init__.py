@@ -4,7 +4,7 @@ mpca — Multilevel PCA for composite indices with measurement error correction.
 Public API
 ----------
 mpca_pipeline          End-to-end pipeline
-option_b_filter        Option B minimum-coverage filter
+option_b_filter        Option Filter minimum-coverage filter
 three_pass_imputation  Three-pass missing-data imputation
 naive_pca              Naive PC1 aggregation
 attenuation_correction Disattenuation of correlations + corrected PCA

@@ -16,7 +16,7 @@ inputs to PCA are themselves noisy estimates with known uncertainty (e.g. from
 bootstrapped confidence intervals). The package implements the full pipeline
 described in the MPCA technical paper:
 
-1. **Option B filter** – exclude observations with fewer than 5 (configurable)
+1. **Option Filter** – exclude observations with fewer than 5 (configurable)
    of the K sub-indices observed.
 2. **Three-pass imputation** – within-country linear interpolation →
    year-mean fallback → global-mean fallback.

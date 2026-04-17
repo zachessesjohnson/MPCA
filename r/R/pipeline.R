@@ -7,7 +7,7 @@
 #' @details
 #' The pipeline executes the following steps in order:
 #' \enumerate{
-#'   \item **Option B filter** – exclude rows with fewer than `min_obs`
+#'   \item **Option Filter** – exclude rows with fewer than `min_obs`
 #'     observed sub-indices.
 #'   \item Compute CI **half-widths** \eqn{h_{ij} = (U_{ij} - L_{ij})/2}.
 #'   \item **Three-pass imputation** – within-country linear interpolation,
@@ -61,7 +61,7 @@ mpca_pipeline <- function(data, score_cols, lower_cols, upper_cols,
     length(upper_cols) == K
   )
 
-  # ---- Step 1: Option B filter ----
+  # ---- Step 1: Option Filter ----
   data       <- option_b_filter(data, score_cols, min_obs)
   data_valid <- data[data$valid_composite, , drop = FALSE]
 

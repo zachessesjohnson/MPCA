@@ -28,7 +28,7 @@ def mpca_pipeline(
 
     Executes the following steps in order:
 
-    1. **Option B filter** — exclude observations with fewer than *min_obs*
+    1. **Option Filter** — exclude observations with fewer than *min_obs*
        observed sub-indices.
     2. Compute CI **half-widths** :math:`h_{ij} = (U_{ij} - L_{ij})/2`.
     3. **Three-pass imputation** — within-country linear interpolation,
@@ -89,7 +89,7 @@ def mpca_pipeline(
             "score_cols, lower_cols, and upper_cols must all have the same length."
         )
 
-    # ---- Step 1: Option B filter ----
+    # ---- Step 1: Option Filter ----
     data = option_b_filter(data, score_cols, min_obs)
     data_valid = data[data["valid_composite"]].copy().reset_index(drop=True)
 
