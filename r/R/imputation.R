@@ -1,4 +1,4 @@
-#' Option Filter Minimum Sub-Index Coverage Filter
+#' Minimum Sub-Index Coverage Filter (Option Filter)
 #'
 #' Observations with fewer than `min_obs` of the K sub-indices observed
 #' (pre-imputation) are flagged as invalid for the composite score.
