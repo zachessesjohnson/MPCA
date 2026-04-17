@@ -8,7 +8,7 @@ Description: Implements measurement-error-corrected principal component
     analysis (MPCA) for composite indices where each sub-index has
     associated uncertainty estimates from bootstrapped confidence intervals.
     The package provides: (1) a three-pass missing-data imputation
-    hierarchy (within-country linear interpolation, year-mean fallback,
+    hierarchy (within-group linear interpolation, time-period-mean fallback,
     global-mean fallback); (2) an Option Filter minimum-coverage filter;
     (3) naive PC1 aggregation; (4) attenuation correction via
     disattenuation of correlations (Spearman 1904), with nearest

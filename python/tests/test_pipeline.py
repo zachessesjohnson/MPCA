@@ -9,10 +9,9 @@ from mpca import mpca_pipeline, two_stage_bootstrap, postprocess_scores
 
 def make_pipeline_df(N=60, K=8, seed=7):
     rng = np.random.default_rng(seed)
-    countries = [f"C{i}" for i in range(1, 21)] * 3
-    isos = countries[:]
-    years = [2022, 2023, 2024] * 20
-    df = pd.DataFrame({"country": countries, "iso": isos, "year": years})
+    groups = [f"G{i}" for i in range(1, 21)] * 3
+    periods = [2022, 2023, 2024] * 20
+    df = pd.DataFrame({"group": groups, "time": periods})
 
     for k in range(K):
         scores = rng.uniform(20, 80, N).astype(float)
@@ -32,7 +31,14 @@ def pipeline_result():
     sc = [f"s{k}" for k in range(8)]
     lo = [f"s{k}_lo" for k in range(8)]
     hi = [f"s{k}_hi" for k in range(8)]
-    return mpca_pipeline(df, sc, lo, hi, B=20, seed=1)
+    return mpca_pipeline(
+        df, sc, lo, hi,
+        id_cols=["group", "time"],
+        group_col="group",
+        time_col="time",
+        rankings_value=2024,
+        B=20, seed=1,
+    )
 
 
 class TestPipelineOutputStructure:
@@ -42,7 +48,7 @@ class TestPipelineOutputStructure:
         assert isinstance(pipeline_result["rankings_df"], pd.DataFrame)
 
     def test_scores_df_columns(self, pipeline_result):
-        expected = {"country", "iso", "year", "score", "ci_lower", "ci_upper"}
+        expected = {"group", "time", "score", "ci_lower", "ci_upper"}
         assert expected.issubset(pipeline_result["scores_df"].columns)
 
     def test_contributions_df_has_eight_rows(self, pipeline_result):
@@ -88,6 +94,30 @@ class TestRankings:
         rd = pipeline_result["rankings_df"]
         if len(rd) > 0:
             assert rd["rank"].iloc[0] == 1
+
+    def test_no_rankings_when_rankings_value_none(self):
+        df = make_pipeline_df()
+        sc = [f"s{k}" for k in range(8)]
+        lo = [f"s{k}_lo" for k in range(8)]
+        hi = [f"s{k}_hi" for k in range(8)]
+        result = mpca_pipeline(
+            df, sc, lo, hi,
+            id_cols=["group", "time"],
+            group_col="group",
+            time_col="time",
+            rankings_value=None,
+            B=20, seed=1,
+        )
+        assert len(result["rankings_df"]) == 0
+
+    def test_pipeline_without_id_cols(self):
+        df = make_pipeline_df()
+        sc = [f"s{k}" for k in range(8)]
+        lo = [f"s{k}_lo" for k in range(8)]
+        hi = [f"s{k}_hi" for k in range(8)]
+        result = mpca_pipeline(df, sc, lo, hi, B=20, seed=1)
+        expected = {"score", "ci_lower", "ci_upper"}
+        assert expected == set(result["scores_df"].columns)
 
 
 class TestBootstrap:

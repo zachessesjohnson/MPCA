@@ -1,10 +1,9 @@
 make_pipeline_df <- function(N = 60, K = 8, seed = 7) {
   set.seed(seed)
-  countries <- rep(paste0("C", 1:20), each = 3)
-  isos      <- rep(paste0("C", 1:20), each = 3)
-  years     <- rep(c(2022, 2023, 2024), times = 20)
+  groups  <- rep(paste0("G", 1:20), each = 3)
+  periods <- rep(c(2022, 2023, 2024), times = 20)
 
-  df <- data.frame(country = countries, iso = isos, year = years,
+  df <- data.frame(grp = groups, time = periods,
                    stringsAsFactors = FALSE)
 
   for (k in 1:K) {
@@ -12,7 +11,7 @@ make_pipeline_df <- function(N = 60, K = 8, seed = 7) {
     hw     <- runif(N, 1, 10)
     # Introduce a few NAs
     scores[sample(N, 5)] <- NA
-    df[[paste0("s", k)]]       <- scores
+    df[[paste0("s", k)]]        <- scores
     df[[paste0("s", k, "_lo")]] <- scores - hw
     df[[paste0("s", k, "_hi")]] <- scores + hw
   }
@@ -26,6 +25,9 @@ test_that("mpca_pipeline returns all three output tables", {
   upper_cols <- paste0("s", 1:8, "_hi")
 
   result <- mpca_pipeline(df, score_cols, lower_cols, upper_cols,
+                           id_cols   = c("grp", "time"),
+                           group_col = "grp",
+                           time_col  = "time",
                            B = 20L, seed = 1L)
 
   expect_true(is.data.frame(result$scores_df))
@@ -38,9 +40,12 @@ test_that("scores_df has expected columns", {
   result <- mpca_pipeline(df, paste0("s", 1:8),
                            paste0("s", 1:8, "_lo"),
                            paste0("s", 1:8, "_hi"),
+                           id_cols   = c("grp", "time"),
+                           group_col = "grp",
+                           time_col  = "time",
                            B = 20L, seed = 1L)
 
-  expect_true(all(c("country", "iso", "year", "score",
+  expect_true(all(c("grp", "time", "score",
                      "ci_lower", "ci_upper") %in% names(result$scores_df)))
 })
 
@@ -49,6 +54,9 @@ test_that("scores are in [0, 100]", {
   result <- mpca_pipeline(df, paste0("s", 1:8),
                            paste0("s", 1:8, "_lo"),
                            paste0("s", 1:8, "_hi"),
+                           id_cols   = c("grp", "time"),
+                           group_col = "grp",
+                           time_col  = "time",
                            B = 20L, seed = 1L)
 
   s <- result$scores_df
@@ -62,6 +70,9 @@ test_that("ci_lower <= score <= ci_upper for all observations", {
   result <- mpca_pipeline(df, paste0("s", 1:8),
                            paste0("s", 1:8, "_lo"),
                            paste0("s", 1:8, "_hi"),
+                           id_cols   = c("grp", "time"),
+                           group_col = "grp",
+                           time_col  = "time",
                            B = 20L, seed = 1L)
 
   s <- result$scores_df
@@ -74,8 +85,12 @@ test_that("rankings_df is sorted descending and contains rank column", {
   result <- mpca_pipeline(df, paste0("s", 1:8),
                            paste0("s", 1:8, "_lo"),
                            paste0("s", 1:8, "_hi"),
-                           B = 20L, seed = 1L,
-                           rankings_year = 2024L)
+                           id_cols        = c("grp", "time"),
+                           group_col      = "grp",
+                           time_col       = "time",
+                           B              = 20L,
+                           seed           = 1L,
+                           rankings_value = 2024L)
 
   rd <- result$rankings_df
   if (nrow(rd) > 1) {
@@ -87,11 +102,27 @@ test_that("rankings_df is sorted descending and contains rank column", {
   }
 })
 
+test_that("rankings_df is empty when rankings_value is NULL", {
+  df     <- make_pipeline_df()
+  result <- mpca_pipeline(df, paste0("s", 1:8),
+                           paste0("s", 1:8, "_lo"),
+                           paste0("s", 1:8, "_hi"),
+                           id_cols   = c("grp", "time"),
+                           group_col = "grp",
+                           time_col  = "time",
+                           B = 20L, seed = 1L,
+                           rankings_value = NULL)
+  expect_equal(nrow(result$rankings_df), 0L)
+})
+
 test_that("contributions_df has all sub-index names and loading/weight columns", {
   df     <- make_pipeline_df()
   result <- mpca_pipeline(df, paste0("s", 1:8),
                            paste0("s", 1:8, "_lo"),
                            paste0("s", 1:8, "_hi"),
+                           id_cols   = c("grp", "time"),
+                           group_col = "grp",
+                           time_col  = "time",
                            B = 20L, seed = 1L)
 
   cd <- result$contributions_df

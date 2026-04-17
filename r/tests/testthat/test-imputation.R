@@ -28,23 +28,25 @@ test_that("option_b_filter with min_obs = 5 and 8 cols flags low-coverage rows",
 
 test_that("three_pass_imputation fills all NAs", {
   df <- data.frame(
-    country = c("A", "A", "A", "B", "B"),
-    year    = c(2000, 2001, 2002, 2000, 2001),
-    s1      = c(50, NA, 60, NA, 70),
-    s1_hw   = c(5, NA, 5, NA, 5)
+    grp   = c("A", "A", "A", "B", "B"),
+    time  = c(2000, 2001, 2002, 2000, 2001),
+    s1    = c(50, NA, 60, NA, 70),
+    s1_hw = c(5, NA, 5, NA, 5)
   )
-  out <- three_pass_imputation(df, "s1", "s1_hw")
+  out <- three_pass_imputation(df, "s1", "s1_hw",
+                                group_col = "grp", time_col = "time")
   expect_false(any(is.na(out$S_hat)))
 })
 
 test_that("three_pass_imputation sets H to 0 for imputed positions", {
   df <- data.frame(
-    country = c("A", "A", "A"),
-    year    = c(2000, 2001, 2002),
-    s1      = c(50, NA, 60),
-    s1_hw   = c(5, NA, 5)
+    grp   = c("A", "A", "A"),
+    time  = c(2000, 2001, 2002),
+    s1    = c(50, NA, 60),
+    s1_hw = c(5, NA, 5)
   )
-  out <- three_pass_imputation(df, "s1", "s1_hw")
+  out <- three_pass_imputation(df, "s1", "s1_hw",
+                                group_col = "grp", time_col = "time")
   # Middle position was imputed, so H should be 0 there
   expect_equal(out$H[2, 1], 0)
   # Observed positions keep their half-width
@@ -54,35 +56,48 @@ test_that("three_pass_imputation sets H to 0 for imputed positions", {
 
 test_that("pass 1 interpolates interior gaps linearly", {
   df <- data.frame(
-    country = rep("A", 3),
-    year    = c(2000, 2001, 2002),
-    s1      = c(50, NA, 60),
-    s1_hw   = c(0, NA, 0)
+    grp   = rep("A", 3),
+    time  = c(2000, 2001, 2002),
+    s1    = c(50, NA, 60),
+    s1_hw = c(0, NA, 0)
   )
-  out <- three_pass_imputation(df, "s1", "s1_hw")
+  out <- three_pass_imputation(df, "s1", "s1_hw",
+                                group_col = "grp", time_col = "time")
   expect_equal(out$S_hat[2, 1], 55)
 })
 
-test_that("pass 2 uses year mean for completely missing country-series", {
+test_that("pass 2 uses time-period mean for completely missing group-series", {
   df <- data.frame(
-    country = c("A", "A", "B"),
-    year    = c(2000, 2001, 2000),
-    s1      = c(NA, NA, 80),
-    s1_hw   = c(NA, NA, 0)
+    grp   = c("A", "A", "B"),
+    time  = c(2000, 2001, 2000),
+    s1    = c(NA, NA, 80),
+    s1_hw = c(NA, NA, 0)
   )
-  out <- three_pass_imputation(df, "s1", "s1_hw")
-  # Country A has no observed values; year 2000 mean = 80, year 2001 = NA -> global mean = 80
-  expect_equal(out$S_hat[which(df$country == "A" & df$year == 2000), 1], 80)
+  out <- three_pass_imputation(df, "s1", "s1_hw",
+                                group_col = "grp", time_col = "time")
+  # Group A has no observed values; time 2000 mean = 80, time 2001 = NA -> global mean = 80
+  expect_equal(out$S_hat[which(df$grp == "A" & df$time == 2000), 1], 80)
 })
 
-test_that("pass 3 uses global mean when entire year missing", {
+test_that("pass 3 uses global mean when entire time period missing", {
   df <- data.frame(
-    country = c("A", "B"),
-    year    = c(2000, 2001),
-    s1      = c(NA, 80),
-    s1_hw   = c(NA, 0)
+    grp   = c("A", "B"),
+    time  = c(2000, 2001),
+    s1    = c(NA, 80),
+    s1_hw = c(NA, 0)
+  )
+  out <- three_pass_imputation(df, "s1", "s1_hw",
+                                group_col = "grp", time_col = "time")
+  # Time 2000 has no observations at all -> global mean = 80
+  expect_equal(out$S_hat[1, 1], 80)
+})
+
+test_that("three_pass_imputation works with no group_col or time_col", {
+  df <- data.frame(
+    s1    = c(NA, 80, 60),
+    s1_hw = c(NA, 0, 0)
   )
   out <- three_pass_imputation(df, "s1", "s1_hw")
-  # Year 2000 has no observations at all -> global mean = 80
-  expect_equal(out$S_hat[1, 1], 80)
+  # Only global mean applies: (80+60)/2 = 70
+  expect_equal(out$S_hat[1, 1], 70)
 })

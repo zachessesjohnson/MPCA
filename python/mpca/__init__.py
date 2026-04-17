@@ -1,5 +1,5 @@
 """
-mpca — Multilevel PCA for composite indices with measurement error correction.
+mpca — Multilevel PCA with measurement error correction.
 
 Public API
 ----------

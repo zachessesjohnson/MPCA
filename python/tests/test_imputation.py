@@ -42,26 +42,29 @@ class TestOptionBFilter:
 class TestThreePassImputation:
     def _basic_df(self):
         return pd.DataFrame({
-            "country": ["A", "A", "A", "B", "B"],
-            "year": [2000, 2001, 2002, 2000, 2001],
+            "group": ["A", "A", "A", "B", "B"],
+            "time": [2000, 2001, 2002, 2000, 2001],
             "s1": [50.0, np.nan, 60.0, np.nan, 70.0],
             "s1_hw": [5.0, np.nan, 5.0, np.nan, 5.0],
         })
 
     def test_no_nans_after_imputation(self):
         df = self._basic_df()
-        S_hat, H = three_pass_imputation(df, ["s1"], ["s1_hw"])
+        S_hat, H = three_pass_imputation(
+            df, ["s1"], ["s1_hw"], group_col="group", time_col="time"
+        )
         assert not np.isnan(S_hat).any()
 
     def test_h_is_zero_for_imputed_positions(self):
         df = pd.DataFrame({
-            "country": ["A", "A", "A"],
-            "year": [2000, 2001, 2002],
+            "group": ["A", "A", "A"],
+            "time": [2000, 2001, 2002],
             "s1": [50.0, np.nan, 60.0],
             "s1_hw": [5.0, np.nan, 5.0],
         })
-        S_hat, H = three_pass_imputation(df, ["s1"], ["s1_hw"])
-        # After sort: rows are already in order
+        S_hat, H = three_pass_imputation(
+            df, ["s1"], ["s1_hw"], group_col="group", time_col="time"
+        )
         # Middle position was NA → H should be 0
         assert H[1, 0] == pytest.approx(0.0)
         assert H[0, 0] == pytest.approx(5.0)
@@ -69,37 +72,51 @@ class TestThreePassImputation:
 
     def test_pass1_linear_interpolation(self):
         df = pd.DataFrame({
-            "country": ["A", "A", "A"],
-            "year": [2000, 2001, 2002],
+            "group": ["A", "A", "A"],
+            "time": [2000, 2001, 2002],
             "s1": [50.0, np.nan, 60.0],
             "s1_hw": [0.0, np.nan, 0.0],
         })
-        S_hat, _ = three_pass_imputation(df, ["s1"], ["s1_hw"])
+        S_hat, _ = three_pass_imputation(
+            df, ["s1"], ["s1_hw"], group_col="group", time_col="time"
+        )
         assert S_hat[1, 0] == pytest.approx(55.0)
 
-    def test_pass2_year_mean_fallback(self):
+    def test_pass2_time_mean_fallback(self):
         df = pd.DataFrame({
-            "country": ["A", "B"],
-            "year": [2000, 2000],
+            "group": ["A", "B"],
+            "time": [2000, 2000],
             "s1": [np.nan, 80.0],
             "s1_hw": [np.nan, 0.0],
         })
-        S_hat, _ = three_pass_imputation(df, ["s1"], ["s1_hw"])
-        # Country A has no observations; year 2000 mean = 80
-        a_idx = df.sort_values(["country", "year"]).index.tolist()
-        sorted_df = df.sort_values(["country", "year"]).reset_index(drop=True)
-        a_pos = sorted_df[sorted_df["country"] == "A"].index[0]
+        S_hat, _ = three_pass_imputation(
+            df, ["s1"], ["s1_hw"], group_col="group", time_col="time"
+        )
+        # Group A has no observations; time 2000 mean = 80
+        sorted_df = df.sort_values(["group", "time"]).reset_index(drop=True)
+        a_pos = sorted_df[sorted_df["group"] == "A"].index[0]
         assert S_hat[a_pos, 0] == pytest.approx(80.0)
 
     def test_pass3_global_mean_fallback(self):
         df = pd.DataFrame({
-            "country": ["A", "B"],
-            "year": [2000, 2001],
+            "group": ["A", "B"],
+            "time": [2000, 2001],
             "s1": [np.nan, 80.0],
             "s1_hw": [np.nan, 0.0],
         })
-        S_hat, _ = three_pass_imputation(df, ["s1"], ["s1_hw"])
-        # Year 2000 has no observations → global mean = 80
-        sorted_df = df.sort_values(["country", "year"]).reset_index(drop=True)
-        a_pos = sorted_df[sorted_df["country"] == "A"].index[0]
+        S_hat, _ = three_pass_imputation(
+            df, ["s1"], ["s1_hw"], group_col="group", time_col="time"
+        )
+        # Time 2000 has no observations → global mean = 80
+        sorted_df = df.sort_values(["group", "time"]).reset_index(drop=True)
+        a_pos = sorted_df[sorted_df["group"] == "A"].index[0]
         assert S_hat[a_pos, 0] == pytest.approx(80.0)
+
+    def test_no_group_col_falls_through_to_global_mean(self):
+        df = pd.DataFrame({
+            "s1": [np.nan, 80.0, 60.0],
+            "s1_hw": [np.nan, 0.0, 0.0],
+        })
+        S_hat, _ = three_pass_imputation(df, ["s1"], ["s1_hw"])
+        # Only Pass 3 applies; global mean = (80+60)/2 = 70
+        assert S_hat[0, 0] == pytest.approx(70.0)
