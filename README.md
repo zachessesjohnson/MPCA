@@ -2,7 +2,7 @@
 
 > Measurement-error-corrected composite indices with uncertainty propagation.
 > Available as both an **R package** and a **Python package**.
-> Works with any panel or cross-sectional data — not restricted to countries.
+> Works with any panel or cross-sectional data.
 
 ---
 
