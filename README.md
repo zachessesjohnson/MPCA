@@ -32,7 +32,8 @@
 8. [Output Format](#output-format)
 9. [Quick-Start Examples](#quick-start-examples)
 10. [Running the Tests](#running-the-tests)
-11. [References](#references)
+11. [Acknowledgments](#acknowledgments)
+12. [References](#references)
 
 ---
 
@@ -872,6 +873,13 @@ To run a single test file:
 ```bash
 pytest tests/test_imputation.py -v
 ```
+
+---
+
+## Acknowledgments
+
+Special thanks to the Institute for Humane Studies for sponsoring this
+research through grant IHS020587.
 
 ---
 
