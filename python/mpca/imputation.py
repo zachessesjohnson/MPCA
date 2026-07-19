@@ -88,6 +88,24 @@ def three_pass_imputation(
     H : np.ndarray, shape (N, K)
         CI half-width matrix (0 for imputed positions).
     """
+    if len(score_cols) != len(half_width_cols):
+        raise ValueError(
+            "score_cols (length "
+            f"{len(score_cols)}) and half_width_cols (length "
+            f"{len(half_width_cols)}) must have the same length."
+        )
+    if len(score_cols) == 0:
+        raise ValueError("Column lists must not be empty.")
+
+    required_cols = set(score_cols) | set(half_width_cols)
+    if group_col is not None:
+        required_cols.add(group_col)
+    if time_col is not None:
+        required_cols.add(time_col)
+    missing = sorted(required_cols - set(data.columns))
+    if missing:
+        raise ValueError(f"Missing required columns: {missing}")
+
     sort_by = [c for c in [group_col, time_col] if c is not None]
     if sort_by:
         data = data.sort_values(sort_by).reset_index(drop=True)
@@ -128,8 +146,10 @@ def three_pass_imputation(
                 periods = data[time_col].values
                 for period in np.unique(periods[still_na]):
                     period_mask = periods == period
-                    period_mean = np.nanmean(s_pass1[period_mask])
-                    if not np.isnan(period_mean):
+                    period_vals = s_pass1[period_mask]
+                    observed_period_vals = period_vals[~np.isnan(period_vals)]
+                    if observed_period_vals.size > 0:
+                        period_mean = observed_period_vals.mean()
                         fill_mask = still_na & period_mask
                         s_pass2[fill_mask] = period_mean
 
@@ -137,8 +157,9 @@ def three_pass_imputation(
         s_pass3 = s_pass2.copy()
         still_na = np.isnan(s_pass3)
         if still_na.any():
-            global_mean = np.nanmean(raw_scores)
-            if not np.isnan(global_mean):
+            observed_raw_scores = raw_scores[~np.isnan(raw_scores)]
+            if observed_raw_scores.size > 0:
+                global_mean = observed_raw_scores.mean()
                 s_pass3[still_na] = global_mean
 
         S_hat[:, j] = s_pass3

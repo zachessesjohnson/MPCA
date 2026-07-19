@@ -1,5 +1,7 @@
 """Tests for imputation and Option Filter."""
 
+import warnings
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -120,3 +122,23 @@ class TestThreePassImputation:
         S_hat, _ = three_pass_imputation(df, ["s1"], ["s1_hw"])
         # Only Pass 3 applies; global mean = (80+60)/2 = 70
         assert S_hat[0, 0] == pytest.approx(70.0)
+
+    def test_raises_on_column_length_mismatch(self):
+        df = pd.DataFrame({"s1": [1.0], "s1_hw": [0.1]})
+        with pytest.raises(ValueError, match="same length"):
+            three_pass_imputation(df, ["s1", "s2"], ["s1_hw"])
+
+    def test_global_fallback_path_emits_no_runtime_warning(self):
+        df = pd.DataFrame({
+            "group": ["A", "B"],
+            "time": [2000, 2001],
+            "s1": [np.nan, 80.0],
+            "s1_hw": [np.nan, 0.0],
+        })
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always", RuntimeWarning)
+            _ = three_pass_imputation(
+                df, ["s1"], ["s1_hw"], group_col="group", time_col="time"
+            )
+        rt_warnings = [w for w in caught if issubclass(w.category, RuntimeWarning)]
+        assert rt_warnings == []
