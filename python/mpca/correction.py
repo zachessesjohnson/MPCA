@@ -2,24 +2,7 @@
 
 import numpy as np
 
-
-def _solve_with_ridge(
-    matrix: np.ndarray,
-    rhs: np.ndarray,
-    base_ridge: float = 1e-10,
-    max_attempts: int = 6,
-) -> np.ndarray:
-    """Solve linear system with deterministic diagonal ridge fallback."""
-    eye = np.eye(matrix.shape[0], dtype=matrix.dtype)
-    for attempt in range(max_attempts + 1):
-        ridge = 0.0 if attempt == 0 else base_ridge * (10 ** (attempt - 1))
-        try:
-            return np.linalg.solve(matrix + ridge * eye, rhs)
-        except np.linalg.LinAlgError:
-            continue
-    raise np.linalg.LinAlgError(
-        "Could not solve linear system even after ridge regularization."
-    )
+from .linalg import solve_with_ridge
 
 
 def attenuation_correction(
@@ -130,7 +113,7 @@ def attenuation_correction(
         ell_hat_star = -ell_hat_star
 
     # ---- Corrected scoring coefficients ----
-    w_hat_star = _solve_with_ridge(R_sig, ell_hat_star)
+    w_hat_star = solve_with_ridge(R_sig, ell_hat_star)
 
     # ---- Re-score: original col means, signal SDs ----
     S_tilde_sig = (S_hat - col_means) / sigma_sig

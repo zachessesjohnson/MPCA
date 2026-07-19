@@ -2,24 +2,7 @@
 
 import numpy as np
 
-
-def _solve_with_ridge(
-    matrix: np.ndarray,
-    rhs: np.ndarray,
-    base_ridge: float = 1e-10,
-    max_attempts: int = 6,
-) -> np.ndarray:
-    """Solve linear system with deterministic diagonal ridge fallback."""
-    eye = np.eye(matrix.shape[0], dtype=matrix.dtype)
-    for attempt in range(max_attempts + 1):
-        ridge = 0.0 if attempt == 0 else base_ridge * (10 ** (attempt - 1))
-        try:
-            return np.linalg.solve(matrix + ridge * eye, rhs)
-        except np.linalg.LinAlgError:
-            continue
-    raise np.linalg.LinAlgError(
-        "Could not solve linear system even after ridge regularization."
-    )
+from .linalg import solve_with_ridge
 
 
 def naive_pca(S_hat: np.ndarray) -> dict:
@@ -89,7 +72,7 @@ def naive_pca(S_hat: np.ndarray) -> dict:
         ell_hat = -ell_hat
 
     # Regression scoring coefficients
-    w_hat = _solve_with_ridge(R_obs, ell_hat)
+    w_hat = solve_with_ridge(R_obs, ell_hat)
 
     # Composite scores
     f_hat = S_tilde @ w_hat
