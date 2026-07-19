@@ -49,6 +49,12 @@ class TestNaivePCA:
         result = naive_pca(S)
         assert 0 < result["var_explained"] <= 1
 
+    def test_raises_on_zero_variance_column(self):
+        S, _ = make_data()
+        S[:, 0] = 50.0
+        with pytest.raises(ValueError, match="zero variance"):
+            naive_pca(S)
+
 
 class TestAttenuationCorrection:
     def test_output_shapes(self):
@@ -92,3 +98,20 @@ class TestAttenuationCorrection:
         naive = naive_pca(S)
         corr = attenuation_correction(S, H, naive)
         assert corr["var_explained_star"] >= naive["var_explained"] - 1e-10
+
+    def test_near_singular_correlation_solve_is_stable(self):
+        rng = np.random.default_rng(11)
+        N, K = 80, 3
+        x = rng.normal(size=N)
+        S = np.column_stack(
+            [
+                x,
+                x + 1e-8 * rng.normal(size=N),
+                rng.normal(size=N),
+            ]
+        )
+        H = np.full((N, K), 0.2)
+
+        naive = naive_pca(S)
+        corr = attenuation_correction(S, H, naive)
+        assert np.all(np.isfinite(corr["w_hat_star"]))

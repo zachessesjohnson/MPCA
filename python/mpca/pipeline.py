@@ -91,17 +91,52 @@ def mpca_pipeline(
         *time_col* is not in *scores_df*.
     """
     K = len(score_cols)
+    if K == 0:
+        raise ValueError("score_cols must contain at least one column name.")
     if len(lower_cols) != K or len(upper_cols) != K:
         raise ValueError(
             "score_cols, lower_cols, and upper_cols must all have the same length."
         )
+    if not isinstance(B, int) or B <= 0:
+        raise ValueError("B must be a positive integer.")
+    if not isinstance(min_obs, int) or min_obs < 1 or min_obs > K:
+        raise ValueError(f"min_obs must be an integer between 1 and {K}.")
 
     if id_cols is None:
         id_cols = []
+    elif not isinstance(id_cols, list):
+        raise ValueError("id_cols must be a list of column names or None.")
+
+    required_cols = set(score_cols) | set(lower_cols) | set(upper_cols) | set(id_cols)
+    for col in [group_col, time_col]:
+        if col is not None:
+            required_cols.add(col)
+    missing = sorted(col for col in required_cols if col not in data.columns)
+    if missing:
+        raise ValueError(
+            "Input data is missing required columns: " + ", ".join(missing)
+        )
+
+    if rankings_value is not None and time_col is None:
+        raise ValueError("rankings_value requires time_col to be provided.")
+
+    for k in range(K):
+        lo = data[lower_cols[k]]
+        up = data[upper_cols[k]]
+        invalid = lo.notna() & up.notna() & (up < lo)
+        if invalid.any():
+            raise ValueError(
+                f"Invalid CI bounds in '{lower_cols[k]}'/'{upper_cols[k]}': "
+                "upper must be >= lower for all non-missing rows."
+            )
 
     # ---- Step 1: Option Filter ----
     data = option_b_filter(data, score_cols, min_obs)
     data_valid = data[data["valid_composite"]].copy().reset_index(drop=True)
+    if data_valid.empty:
+        raise ValueError(
+            "All rows were filtered out by option_b_filter; no valid observations remain."
+        )
 
     # ---- Step 2: CI half-widths ----
     hw_cols = [f"{c}_hw" for c in score_cols]

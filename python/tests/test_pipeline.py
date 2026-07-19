@@ -151,3 +151,118 @@ class TestPostprocess:
         assert np.all(pp["score"] <= 100 + 1e-10)
         assert np.all(pp["ci_lower"] >= -1e-10)
         assert np.all(pp["ci_upper"] <= 100 + 1e-10)
+
+    def test_constant_score_path(self):
+        f = np.full(12, 7.0)
+        lo = np.full(12, 6.5)
+        hi = np.full(12, 7.5)
+        pp = postprocess_scores(f, lo, hi)
+        assert np.allclose(pp["score"], 50.0)
+        assert np.allclose(pp["ci_lower"], 50.0)
+        assert np.allclose(pp["ci_upper"], 50.0)
+
+
+class TestPipelineValidationAndEdgeCases:
+    def test_invalid_ci_bounds_raise(self):
+        df = make_pipeline_df(N=60, K=2, seed=3)
+        df["s0_lo"] = df["s0"] + 5.0
+        df["s0_hi"] = df["s0"] - 5.0
+
+        with pytest.raises(ValueError, match="upper must be >= lower"):
+            mpca_pipeline(
+                df,
+                ["s0", "s1"],
+                ["s0_lo", "s1_lo"],
+                ["s0_hi", "s1_hi"],
+                group_col="group",
+                time_col="time",
+                min_obs=1,
+                B=10,
+                seed=1,
+            )
+
+    def test_all_rows_filtered_out_raises(self):
+        df = make_pipeline_df(N=60, K=2, seed=4)
+        df[["s0", "s1"]] = np.nan
+
+        with pytest.raises(ValueError, match="All rows were filtered out"):
+            mpca_pipeline(
+                df,
+                ["s0", "s1"],
+                ["s0_lo", "s1_lo"],
+                ["s0_hi", "s1_hi"],
+                min_obs=1,
+                B=10,
+                seed=1,
+            )
+
+    def test_small_n_k1_runs(self):
+        df = pd.DataFrame(
+            {
+                "group": ["A", "B"],
+                "time": [2024, 2024],
+                "s0": [40.0, 60.0],
+                "s0_lo": [38.0, 58.0],
+                "s0_hi": [42.0, 62.0],
+            }
+        )
+        result = mpca_pipeline(
+            df,
+            ["s0"],
+            ["s0_lo"],
+            ["s0_hi"],
+            id_cols=["group", "time"],
+            group_col="group",
+            time_col="time",
+            min_obs=1,
+            B=10,
+            seed=1,
+            rankings_value=2024,
+        )
+
+        assert len(result["scores_df"]) == 2
+        assert len(result["contributions_df"]) == 1
+        assert "rank" in result["rankings_df"].columns
+
+    def test_rankings_value_without_time_col_raises(self):
+        df = make_pipeline_df(N=60, K=2, seed=5)
+        with pytest.raises(ValueError, match="rankings_value requires time_col"):
+            mpca_pipeline(
+                df,
+                ["s0", "s1"],
+                ["s0_lo", "s1_lo"],
+                ["s0_hi", "s1_hi"],
+                rankings_value=2024,
+                min_obs=1,
+                B=10,
+                seed=1,
+            )
+
+    def test_missing_required_columns_raise(self):
+        df = make_pipeline_df(N=60, K=2, seed=6).drop(columns=["s1_hi"])
+        with pytest.raises(ValueError, match="missing required columns"):
+            mpca_pipeline(
+                df,
+                ["s0", "s1"],
+                ["s0_lo", "s1_lo"],
+                ["s0_hi", "s1_hi"],
+                min_obs=1,
+                B=10,
+                seed=1,
+            )
+
+    def test_constant_sub_index_column_raises(self):
+        df = make_pipeline_df(N=60, K=2, seed=8)
+        df["s0"] = 50.0
+        with pytest.raises(ValueError, match="zero variance"):
+            mpca_pipeline(
+                df,
+                ["s0", "s1"],
+                ["s0_lo", "s1_lo"],
+                ["s0_hi", "s1_hi"],
+                group_col="group",
+                time_col="time",
+                min_obs=1,
+                B=10,
+                seed=1,
+            )

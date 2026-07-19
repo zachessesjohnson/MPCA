@@ -3,6 +3,25 @@
 import numpy as np
 
 
+def _solve_with_ridge(
+    matrix: np.ndarray,
+    rhs: np.ndarray,
+    base_ridge: float = 1e-10,
+    max_attempts: int = 6,
+) -> np.ndarray:
+    """Solve linear system with deterministic diagonal ridge fallback."""
+    eye = np.eye(matrix.shape[0], dtype=matrix.dtype)
+    for attempt in range(max_attempts + 1):
+        ridge = 0.0 if attempt == 0 else base_ridge * (10 ** (attempt - 1))
+        try:
+            return np.linalg.solve(matrix + ridge * eye, rhs)
+        except np.linalg.LinAlgError:
+            continue
+    raise np.linalg.LinAlgError(
+        "Could not solve linear system even after ridge regularization."
+    )
+
+
 def naive_pca(S_hat: np.ndarray) -> dict:
     """
     Standardize sub-index scores and extract the leading PC.
@@ -37,9 +56,18 @@ def naive_pca(S_hat: np.ndarray) -> dict:
         Proportion of variance explained by PC1.
     """
     N, K = S_hat.shape
+    if N < 2:
+        raise ValueError("naive_pca requires at least 2 observations (N >= 2).")
 
     col_means = S_hat.mean(axis=0)
     col_sds = S_hat.std(axis=0, ddof=1)
+    zero_sd = np.where(~np.isfinite(col_sds) | (col_sds == 0))[0]
+    if len(zero_sd) > 0:
+        bad = ", ".join(str(int(i)) for i in zero_sd)
+        raise ValueError(
+            "naive_pca cannot standardize columns with zero variance. "
+            f"Problem column indices: {bad}."
+        )
 
     S_tilde = (S_hat - col_means) / col_sds
 
@@ -61,7 +89,7 @@ def naive_pca(S_hat: np.ndarray) -> dict:
         ell_hat = -ell_hat
 
     # Regression scoring coefficients
-    w_hat = np.linalg.solve(R_obs, ell_hat)
+    w_hat = _solve_with_ridge(R_obs, ell_hat)
 
     # Composite scores
     f_hat = S_tilde @ w_hat

@@ -52,6 +52,8 @@ def postprocess_scores(
     # ---- Step 1: Z-score ----
     mu = np.nanmean(f_hat_star)
     sig = np.nanstd(f_hat_star, ddof=1)
+    if (not np.isfinite(sig)) or sig <= eps:
+        sig = 1.0
 
     z_score = (f_hat_star - mu) / sig
     z_lower = (ci_lower - mu) / sig
@@ -74,6 +76,10 @@ def postprocess_scores(
     bc_min = np.nanmin(bc_score)
     bc_max = np.nanmax(bc_score)
     rng = bc_max - bc_min
+
+    if (not np.isfinite(rng)) or rng <= eps:
+        const = np.full_like(bc_score, 50.0, dtype=float)
+        return {"score": const, "ci_lower": const.copy(), "ci_upper": const.copy()}
 
     def rescale(x: np.ndarray) -> np.ndarray:
         return 100.0 * (x - bc_min) / rng
