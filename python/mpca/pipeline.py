@@ -104,8 +104,10 @@ def mpca_pipeline(
 
     if id_cols is None:
         id_cols = []
-    elif not isinstance(id_cols, list):
-        raise ValueError("id_cols must be a list of column names or None.")
+    elif isinstance(id_cols, (list, tuple)):
+        id_cols = list(id_cols)
+    else:
+        raise ValueError("id_cols must be a list/tuple of column names or None.")
 
     required_cols = set(score_cols) | set(lower_cols) | set(upper_cols) | set(id_cols)
     for col in [group_col, time_col]:

@@ -52,6 +52,7 @@ def postprocess_scores(
     # ---- Step 1: Z-score ----
     mu = np.nanmean(f_hat_star)
     sig = np.nanstd(f_hat_star, ddof=1)
+    # Prevent division-by-zero when the point-estimate vector is constant.
     if (not np.isfinite(sig)) or sig <= eps:
         sig = 1.0
 
